@@ -7,14 +7,14 @@ DESTDIR ?= "$(CURDIR)/install"
 ARCH ?= $(shell dpkg --print-architecture)
 GRUB_ARCH_amd64 := x64
 GRUB_ARCH_arm64 := aa64
-SHIM_SIGNED := $(STAGEDIR)/usr/lib/shim/shim$(GRUB_ARCH_$(ARCH)).efi.signed
+GRUB_ARCH = $(GRUB_ARCH_$(ARCH))
+SHIM_SIGNED := $(STAGEDIR)/usr/lib/shim/shim$(GRUB_ARCH).efi.signed
 SHIM_LATEST := $(SHIM_SIGNED).latest
 
 # filtered list of modules included in the signed EFI grub image, excluding
 # ones that we don't think are useful in snappy.
-GRUB_MODULES = \
+GRUB_MODULES_common = \
 	all_video \
-	biosdisk \
 	boot \
 	cat \
 	chain \
@@ -63,6 +63,9 @@ GRUB_MODULES = \
 	raid5rec \
 	raid6rec \
 	video
+GRUB_MODULES_amd64 = $(GRUB_MODULES_common) biosdisk
+GRUB_MODULES_arm64 = $(GRUB_MODULES_common)
+GRUB_MODULES = $(GRUB_MODULES_$(ARCH))
 
 # which GRUB packages to stage
 GRUB_PKGS_amd64 = \
@@ -112,8 +115,11 @@ all: boot install
 boot:
 	# Check if we're running under snapcraft. If not, we need to 'stage'
 	# some packages by ourselves.
+	$(info $(GRUB_PKGS))
 ifndef SNAPCRAFT_PROJECT_NAME
-	$(foreach pkg,$(GRUB_PKGS),$(call stage_package,$pkg))
+	$(foreach pkg,$(GRUB_PKGS), \
+	    $(call stage_package,$(pkg)); \
+	)
 endif
 	if [ -e $(STAGEDIR)/usr/lib/grub/$(GRUB_FORMAT)/boot.img ]; then \
 	    dd if=$(STAGEDIR)/usr/lib/grub/$(GRUB_FORMAT)/boot.img of=pc-boot.img bs=440 count=1; \
